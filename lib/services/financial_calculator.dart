@@ -17,10 +17,7 @@ class AccountBalance {
   final String accountId;
   final int balance;
 
-  const AccountBalance({
-    required this.accountId,
-    required this.balance,
-  });
+  const AccountBalance({required this.accountId, required this.balance});
 }
 
 class FinancialCalculator {
@@ -31,13 +28,11 @@ class FinancialCalculator {
     var totalExpenses = 0;
 
     for (final transaction in transactions) {
-      if (transaction.type ==
-          transaction_model.TransactionType.income.index) {
+      if (transaction.type == transaction_model.TransactionType.income.index) {
         totalIncome += transaction.amount;
       }
 
-      if (transaction.type ==
-          transaction_model.TransactionType.expense.index) {
+      if (transaction.type == transaction_model.TransactionType.expense.index) {
         totalExpenses += transaction.amount;
       }
     }
@@ -59,9 +54,7 @@ class FinancialCalculator {
     for (final transaction in transactions) {
       balances.putIfAbsent(transaction.accountId, () => 0);
 
-      final type = transaction_model.TransactionType.values[
-        transaction.type
-      ];
+      final type = transaction_model.TransactionType.values[transaction.type];
 
       switch (type) {
         case transaction_model.TransactionType.income:
@@ -76,8 +69,7 @@ class FinancialCalculator {
           balances[transaction.accountId] =
               balances[transaction.accountId]! - transaction.amount;
 
-          final destinationId =
-              transaction.destinationAccountId;
+          final destinationId = transaction.destinationAccountId;
 
           if (destinationId != null) {
             balances.putIfAbsent(destinationId, () => 0);
@@ -87,6 +79,9 @@ class FinancialCalculator {
           }
 
         case transaction_model.TransactionType.debtPayment:
+          balances[transaction.accountId] =
+              balances[transaction.accountId]! - transaction.amount;
+
         case transaction_model.TransactionType.lending:
         case transaction_model.TransactionType.repayment:
           break;
@@ -95,10 +90,7 @@ class FinancialCalculator {
 
     return balances.entries
         .map(
-          (entry) => AccountBalance(
-            accountId: entry.key,
-            balance: entry.value,
-          ),
+          (entry) => AccountBalance(accountId: entry.key, balance: entry.value),
         )
         .toList();
   }

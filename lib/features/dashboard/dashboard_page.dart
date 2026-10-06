@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../accounts/accounts_page.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -51,11 +52,20 @@ class DashboardPage extends StatelessWidget {
               ),
               const SizedBox(height: 28),
 
-              _MoneyCard(
-                title: 'DINERO TOTAL',
-                amount: '\$0',
-                icon: Icons.account_balance_wallet_rounded,
-              ),
+              GestureDetector(
+  onTap: () {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const AccountsPage(),
+      ),
+    );
+  },
+  child: const _MoneyCard(
+    title: 'DINERO TOTAL',
+    amount: '\$0',
+    icon: Icons.account_balance_wallet_rounded,
+  ),
+),
 
               const SizedBox(height: 14),
 

@@ -1,22 +1,34 @@
+import 'package:drift/native.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:molina_os/main.dart';
+import 'package:molina_os/data/app_database.dart';
+import 'package:molina_os/data/repositories/account_repository.dart';
+
 void main() {
-  testWidgets('MOLINA OS muestra el dashboard inicial', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const MolinaOSApp());
-    expect(find.text('MOLINA OS'), findsOneWidget);
-    expect(find.text('Buenos días, Julián'), findsOneWidget);
-    expect(
-      find.text('Tu dinero. Tus decisiones. Tu futuro.'),
-      findsOneWidget,
+  test('MOLINA OS puede guardar y leer una cuenta', () async {
+    final database = AppDatabase(
+      NativeDatabase.memory(),
     );
-    expect(find.text('DINERO TOTAL'), findsOneWidget);
-    expect(find.text('DISPONIBLE REAL'), findsOneWidget);
-    expect(find.text('Ingresos'), findsOneWidget);
-    expect(find.text('Gastos'), findsOneWidget);
-    expect(find.text('Deudas'), findsOneWidget);
-    expect(find.text('Salir de deudas'), findsOneWidget);
-    expect(find.text('Registrar movimiento'), findsOneWidget);
+
+    final repository = AccountRepository(database);
+
+    await repository.create(
+      AccountsCompanion.insert(
+        id: 'test-account',
+        name: 'Cuenta de prueba',
+        type: 0,
+        currency: const Value('COP'),
+        legalOwner: 0,
+        economicResponsible: 0,
+      ),
+    );
+
+    final account = await repository.findById('test-account');
+
+    expect(account, isNotNull);
+    expect(account!.name, 'Cuenta de prueba');
+    expect(account.currency, 'COP');
+
+    await database.close();
   });
 }

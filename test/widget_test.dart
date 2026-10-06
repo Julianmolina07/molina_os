@@ -8,9 +8,7 @@ import 'package:molina_os/data/repositories/transaction_repository.dart';
 
 void main() {
   test('MOLINA OS puede guardar una cuenta y un movimiento', () async {
-    final database = AppDatabase(
-      NativeDatabase.memory(),
-    );
+    final database = AppDatabase(NativeDatabase.memory());
 
     final accountRepository = AccountRepository(database);
     final transactionRepository = TransactionRepository(database);
@@ -42,8 +40,9 @@ void main() {
       ),
     );
 
-    final transaction =
-        await transactionRepository.findById('test-transaction');
+    final transaction = await transactionRepository.findById(
+      'test-transaction',
+    );
 
     expect(transaction, isNotNull);
     expect(transaction!.amount, 50000);
@@ -53,9 +52,7 @@ void main() {
   });
 
   test('MOLINA OS puede guardar y consultar una deuda', () async {
-    final database = AppDatabase(
-      NativeDatabase.memory(),
-    );
+    final database = AppDatabase(NativeDatabase.memory());
 
     final debtRepository = DebtRepository(database);
 
@@ -70,9 +67,7 @@ void main() {
         startDate: DateTime(2026, 1, 15),
         installmentAmount: const Value(450000),
         frequency: const Value(3),
-        nextDueDate: Value(
-          DateTime(2026, 11, 15),
-        ),
+        nextDueDate: Value(DateTime(2026, 11, 15)),
         status: const Value(0),
         notes: const Value('Deuda de prueba'),
       ),
@@ -92,4 +87,44 @@ void main() {
 
     await database.close();
   });
+
+  test(
+    'MOLINA OS puede registrar un abono y reducir el saldo de una deuda',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+
+      final debtRepository = DebtRepository(database);
+
+      await debtRepository.create(
+        DebtsCompanion.insert(
+          id: 'payment-test-debt',
+          creditor: 'Banco de prueba',
+          name: 'Tarjeta de crédito',
+          originalAmount: 8000000,
+          remainingBalance: 5400000,
+          interestRate: const Value(25.0),
+          startDate: DateTime(2026, 1, 15),
+          installmentAmount: const Value(450000),
+          frequency: const Value(3),
+          nextDueDate: Value(DateTime(2026, 11, 15)),
+          status: const Value(0),
+        ),
+      );
+
+      final result = await debtRepository.registerPrincipalPayment(
+        debtId: 'payment-test-debt',
+        amount: 400000,
+      );
+
+      expect(result, isTrue);
+
+      final debt = await debtRepository.findById('payment-test-debt');
+
+      expect(debt, isNotNull);
+      expect(debt!.remainingBalance, 5000000);
+      expect(debt.status, 0);
+
+      await database.close();
+    },
+  );
 }

@@ -10,26 +10,14 @@ class DebtsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final debtRepository =
-        DebtRepository(DatabaseProvider.instance);
+    final repository = DebtRepository(DatabaseProvider.instance);
 
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Text(
-          'Deudas',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Deudas')),
       body: StreamBuilder<List<Debt>>(
-        stream: debtRepository.watchAll(),
+        stream: repository.watchAll(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -45,84 +33,146 @@ class DebtsPage extends StatelessWidget {
           }
 
           if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final debts = snapshot.data!;
 
-          final activeDebts = debts.where((debt) {
-            return debt.status == 0 || debt.status == 2;
-          }).toList();
+          final activeDebts = debts
+              .where((debt) => debt.status == 0 || debt.status == 2)
+              .toList();
 
-          final totalOriginal = debts.fold<int>(
+          final totalOriginal = activeDebts.fold<int>(
             0,
             (total, debt) => total + debt.originalAmount,
           );
 
-          final totalRemaining = debts.fold<int>(
+          final totalRemaining = activeDebts.fold<int>(
             0,
             (total, debt) => total + debt.remainingBalance,
           );
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(
-              20,
-              8,
-              20,
-              32,
-            ),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _DebtSummaryCard(
-                  totalOriginal: totalOriginal,
-                  totalRemaining: totalRemaining,
-                  activeCount: activeDebts.length,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Saldo pendiente total',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colorScheme.onSurface.withValues(alpha: 0.60),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _formatCurrency(totalRemaining),
+                        style: TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _SummaryItem(
+                              label: 'Original',
+                              value: _formatCurrency(totalOriginal),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _SummaryItem(
+                              label: 'Deudas activas',
+                              value: '${activeDebts.length}',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 28),
                 Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Deudas activas',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
+                    Expanded(
+                      child: Text(
+                        'Mis deudas',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
+                        ),
                       ),
                     ),
-                    Text(
-                      '${activeDebts.length}',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface
-                            .withValues(alpha: 0.55),
-                      ),
+                    IconButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AddDebtPage(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.add_rounded),
+                      tooltip: 'Nueva deuda',
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 if (activeDebts.isEmpty)
-                  _EmptyDebtsState(
-                    onAddDebt: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const AddDebtPage(),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          size: 44,
+                          color: colorScheme.primary,
                         ),
-                      );
-                    },
+                        const SizedBox(height: 12),
+                        Text(
+                          'No tienes deudas activas',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Tu situación de deuda está limpia.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.60,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   )
                 else
                   ...activeDebts.map(
                     (debt) => Padding(
-                      padding:
-                          const EdgeInsets.only(bottom: 12),
-                      child: _DebtCard(debt: debt),
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: _DebtCard(debt: debt, repository: repository),
                     ),
                   ),
                 const SizedBox(height: 12),
@@ -132,10 +182,7 @@ class DebtsPage extends StatelessWidget {
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const AddDebtPage(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const AddDebtPage()),
                       );
                     },
                     icon: const Icon(Icons.add_rounded),
@@ -155,73 +202,6 @@ class DebtsPage extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DebtSummaryCard extends StatelessWidget {
-  final int totalOriginal;
-  final int totalRemaining;
-  final int activeCount;
-
-  const _DebtSummaryCard({
-    required this.totalOriginal,
-    required this.totalRemaining,
-    required this.activeCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'DEUDA TOTAL PENDIENTE',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.8,
-              color: colorScheme.onSurface
-                  .withValues(alpha: 0.60),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _formatCurrency(totalRemaining),
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: _SummaryItem(
-                  title: 'Original',
-                  value: _formatCurrency(totalOriginal),
-                ),
-              ),
-              Expanded(
-                child: _SummaryItem(
-                  title: 'Activas',
-                  value: '$activeCount',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   static String _formatCurrency(int amount) {
     final value = amount.abs().toString();
@@ -232,8 +212,7 @@ class _DebtSummaryCard extends StatelessWidget {
 
       buffer.write(value[i]);
 
-      if (positionFromEnd > 1 &&
-          positionFromEnd % 3 == 1) {
+      if (positionFromEnd > 1 && positionFromEnd % 3 == 1) {
         buffer.write('.');
       }
     }
@@ -243,56 +222,21 @@ class _DebtSummaryCard extends StatelessWidget {
   }
 }
 
-class _SummaryItem extends StatelessWidget {
-  final String title;
-  final String value;
-
-  const _SummaryItem({
-    required this.title,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            color: colorScheme.onSurface
-                .withValues(alpha: 0.55),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-            color: colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _DebtCard extends StatelessWidget {
   final Debt debt;
+  final DebtRepository repository;
 
-  const _DebtCard({
-    required this.debt,
-  });
+  const _DebtCard({required this.debt, required this.repository});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final isOverdue = debt.status == 2;
+    final progress = debt.originalAmount <= 0
+        ? 0.0
+        : (debt.originalAmount - debt.remainingBalance) / debt.originalAmount;
+
+    final safeProgress = progress.clamp(0.0, 1.0);
 
     return Container(
       width: double.infinity,
@@ -308,13 +252,12 @@ class _DebtCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       debt.name,
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: colorScheme.onSurface,
                       ),
@@ -324,21 +267,20 @@ class _DebtCard extends StatelessWidget {
                       debt.creditor,
                       style: TextStyle(
                         fontSize: 14,
-                        color: colorScheme.onSurface
-                            .withValues(alpha: 0.60),
+                        color: colorScheme.onSurface.withValues(alpha: 0.60),
                       ),
                     ),
                   ],
                 ),
               ),
-              if (isOverdue)
+              if (debt.status == 2)
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.errorContainer,
+                    color: colorScheme.error.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -346,61 +288,163 @@ class _DebtCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onErrorContainer,
+                      color: colorScheme.error,
                     ),
                   ),
                 ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           Text(
             'Saldo pendiente',
             style: TextStyle(
               fontSize: 13,
-              color: colorScheme.onSurface
-                  .withValues(alpha: 0.55),
+              color: colorScheme.onSurface.withValues(alpha: 0.60),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             _formatCurrency(debt.remainingBalance),
             style: TextStyle(
-              fontSize: 23,
+              fontSize: 26,
               fontWeight: FontWeight.w800,
               color: colorScheme.onSurface,
             ),
           ),
-          if (debt.installmentAmount != null) ...[
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _DebtDetail(
-                    title: 'Cuota',
-                    value: _formatCurrency(
-                      debt.installmentAmount!,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: _DebtDetail(
-                    title: 'Interés',
-                    value: '${debt.interestRate}%',
-                  ),
-                ),
-              ],
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(value: safeProgress, minHeight: 8),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${(safeProgress * 100).round()}% pagado',
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurface.withValues(alpha: 0.60),
             ),
-          ],
-          if (debt.nextDueDate != null) ...[
-            const SizedBox(height: 14),
+          ),
+          const SizedBox(height: 18),
+          if (debt.installmentAmount != null)
             _DebtDetail(
-              title: 'Próximo pago',
+              label: 'Cuota',
+              value: _formatCurrency(debt.installmentAmount!),
+            ),
+          if (debt.interestRate > 0)
+            _DebtDetail(
+              label: 'Interés anual',
+              value: '${debt.interestRate.toStringAsFixed(2)}%',
+            ),
+          if (debt.nextDueDate != null)
+            _DebtDetail(
+              label: 'Próximo pago',
               value: _formatDate(debt.nextDueDate!),
             ),
-          ],
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                _showPaymentDialog(context, debt, repository);
+              },
+              icon: const Icon(Icons.payments_outlined),
+              label: const Text(
+                'Registrar pago',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _showPaymentDialog(
+    BuildContext context,
+    Debt debt,
+    DebtRepository repository,
+  ) async {
+    final controller = TextEditingController();
+
+    final amount = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Registrar pago'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Valor del abono',
+              prefixText: '\$ ',
+              hintText: 'Máximo ${_formatCurrency(debt.remainingBalance)}',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = int.tryParse(
+                  controller.text
+                      .replaceAll('.', '')
+                      .replaceAll(',', '')
+                      .trim(),
+                );
+
+                if (value == null ||
+                    value <= 0 ||
+                    value > debt.remainingBalance) {
+                  return;
+                }
+
+                Navigator.of(dialogContext).pop(value);
+              },
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (amount == null || !context.mounted) {
+      return;
+    }
+
+    try {
+      final success = await repository.registerPrincipalPayment(
+        debtId: debt.id,
+        amount: amount,
+      );
+
+      if (!context.mounted) {
+        return;
+      }
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Pago de ${_formatCurrency(amount)} registrado.'),
+          ),
+        );
+      }
+    } on Object catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo registrar el pago: $error')),
+      );
+    }
   }
 
   static String _formatCurrency(int amount) {
@@ -412,8 +456,7 @@ class _DebtCard extends StatelessWidget {
 
       buffer.write(value[i]);
 
-      if (positionFromEnd > 1 &&
-          positionFromEnd % 3 == 1) {
+      if (positionFromEnd > 1 && positionFromEnd % 3 == 1) {
         buffer.write('.');
       }
     }
@@ -432,13 +475,47 @@ class _DebtCard extends StatelessWidget {
 }
 
 class _DebtDetail extends StatelessWidget {
-  final String title;
+  final String label;
   final String value;
 
-  const _DebtDetail({
-    required this.title,
-    required this.value,
-  });
+  const _DebtDetail({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurface.withValues(alpha: 0.60),
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SummaryItem({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
@@ -448,81 +525,22 @@ class _DebtDetail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title,
+          label,
           style: TextStyle(
             fontSize: 13,
-            color: colorScheme.onSurface
-                .withValues(alpha: 0.55),
+            color: colorScheme.onSurface.withValues(alpha: 0.60),
           ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
             color: colorScheme.onSurface,
           ),
         ),
       ],
-    );
-  }
-}
-
-class _EmptyDebtsState extends StatelessWidget {
-  final VoidCallback onAddDebt;
-
-  const _EmptyDebtsState({
-    required this.onAddDebt,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.credit_card_off_rounded,
-            size: 42,
-            color: colorScheme.onSurface
-                .withValues(alpha: 0.55),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            'No tienes deudas registradas',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Registra tus deudas para comenzar a '
-            'tener una visión real de tu situación financiera.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: colorScheme.onSurface
-                  .withValues(alpha: 0.60),
-            ),
-          ),
-          const SizedBox(height: 18),
-          OutlinedButton(
-            onPressed: onAddDebt,
-            child: const Text('Registrar deuda'),
-          ),
-        ],
-      ),
     );
   }
 }

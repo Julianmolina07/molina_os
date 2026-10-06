@@ -23,7 +23,10 @@ class AccountBalance {
 class FinancialCalculator {
   const FinancialCalculator();
 
-  FinancialSummary calculate(List<Transaction> transactions) {
+  FinancialSummary calculate(
+    List<Transaction> transactions, {
+    List<DebtPayment> debtPayments = const [],
+  }) {
     var totalIncome = 0;
     var totalExpenses = 0;
 
@@ -35,6 +38,16 @@ class FinancialCalculator {
       if (transaction.type == transaction_model.TransactionType.expense.index) {
         totalExpenses += transaction.amount;
       }
+    }
+
+    // Los intereses y comisiones de las deudas son gastos reales.
+    //
+    // El capital NO se suma como gasto porque representa una
+    // reducción del pasivo y ya está reflejado como salida de caja
+    // en el movimiento debtPayment.
+    for (final payment in debtPayments) {
+      totalExpenses += payment.interestAmount;
+      totalExpenses += payment.feeAmount;
     }
 
     final totalMoney = totalIncome - totalExpenses;

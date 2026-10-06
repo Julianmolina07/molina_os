@@ -14,7 +14,6 @@ void main() {
     final database = AppDatabase(NativeDatabase.memory());
 
     final accountRepository = AccountRepository(database);
-
     final transactionRepository = TransactionRepository(database);
 
     await accountRepository.create(
@@ -127,18 +126,17 @@ void main() {
     await database.close();
   });
 
-  test('MOLINA OS registra un pago de deuda descontando la cuenta sin duplicarlo como gasto', () async {
+  test('MOLINA OS registra un pago con capital, intereses y comisión '
+      'sin duplicar la salida de dinero', () async {
     final database = AppDatabase(NativeDatabase.memory());
 
     final accountRepository = AccountRepository(database);
-
     final debtRepository = DebtRepository(database);
-
     final debtPaymentService = DebtPaymentService(database);
 
     await accountRepository.create(
       AccountsCompanion.insert(
-        id: 'payment-account-test',
+        id: 'breakdown-account-test',
         name: 'Cuenta de prueba',
         type: 0,
         currency: const Value('COP'),
@@ -150,9 +148,9 @@ void main() {
 
     await debtRepository.create(
       DebtsCompanion.insert(
-        id: 'payment-service-debt',
+        id: 'breakdown-debt-test',
         creditor: 'Banco de prueba',
-        name: 'Crédito de prueba',
+        name: 'Crédito con intereses',
         originalAmount: 8000000,
         remainingBalance: 5400000,
         interestRate: const Value(25.0),
@@ -168,27 +166,32 @@ void main() {
         .into(database.transactions)
         .insert(
           TransactionsCompanion.insert(
-            id: 'payment-account-initial-money',
+            id: 'breakdown-initial-income',
             type: transaction_model.TransactionType.income.index,
             amount: 3000000,
-            accountId: 'payment-account-test',
+            accountId: 'breakdown-account-test',
             category: transaction_model.TransactionCategory.work.index,
             date: DateTime(2026, 10, 1),
           ),
         );
 
-    await debtPaymentService.registerPrincipalPayment(
-      debtId: 'payment-service-debt',
-      accountId: 'payment-account-test',
-      amount: 400000,
+    await debtPaymentService.registerPayment(
+      debtId: 'breakdown-debt-test',
+      accountId: 'breakdown-account-test',
+      totalAmount: 400000,
+      principalAmount: 350000,
+      interestAmount: 40000,
+      feeAmount: 10000,
       date: DateTime(2026, 10, 6),
-      note: 'Abono de prueba',
+      note: 'Cuota de prueba con intereses y comisión',
     );
 
-    final debt = await debtRepository.findById('payment-service-debt');
+    final debt = await debtRepository.findById('breakdown-debt-test');
 
     expect(debt, isNotNull);
-    expect(debt!.remainingBalance, 5000000);
+
+    // Solo el capital reduce la deuda.
+    expect(debt!.remainingBalance, 5050000);
     expect(debt.status, 0);
 
     final transactions =
@@ -200,30 +203,66 @@ void main() {
             ]))
             .get();
 
+    // Ingreso inicial + un único movimiento de salida.
     expect(transactions, hasLength(2));
 
     final payment = transactions.last;
 
     expect(payment.type, transaction_model.TransactionType.debtPayment.index);
+
+    // La salida de dinero es el total completo.
     expect(payment.amount, 400000);
-    expect(payment.accountId, 'payment-account-test');
-    expect(payment.debtId, 'payment-service-debt');
+    expect(payment.accountId, 'breakdown-account-test');
+    expect(payment.debtId, 'breakdown-debt-test');
+
+    // El desglose contable vive en DebtPayments.
+    final debtPayments = await (database.select(
+      database.debtPayments,
+    )..where((payment) => payment.debtId.equals('breakdown-debt-test'))).get();
+
+    expect(debtPayments, hasLength(1));
+
+    final breakdown = debtPayments.single;
+
+    expect(breakdown.debtId, 'breakdown-debt-test');
+    expect(breakdown.transactionId, payment.id);
+    expect(breakdown.totalAmount, 400000);
+    expect(breakdown.principalAmount, 350000);
+    expect(breakdown.interestAmount, 40000);
+    expect(breakdown.feeAmount, 10000);
+
+    expect(
+      breakdown.totalAmount,
+      breakdown.principalAmount +
+          breakdown.interestAmount +
+          breakdown.feeAmount,
+    );
+
+    expect(breakdown.note, 'Cuota de prueba con intereses y comisión');
 
     final calculator = FinancialCalculator();
 
     final balances = calculator.calculateAccountBalances(transactions);
 
     final accountBalance = balances.firstWhere(
-      (balance) => balance.accountId == 'payment-account-test',
+      (balance) => balance.accountId == 'breakdown-account-test',
     );
 
+    // 3.000.000 - 400.000 = 2.600.000.
     expect(accountBalance.balance, 2600000);
 
-    final summary = calculator.calculate(transactions);
+    final summary = calculator.calculate(
+      transactions,
+      debtPayments: debtPayments,
+    );
 
     expect(summary.totalIncome, 3000000);
-    expect(summary.totalExpenses, 0);
-    expect(summary.totalMoney, 3000000);
+
+    // $40.000 de intereses + $10.000 de comisión.
+    expect(summary.totalExpenses, 50000);
+
+    // El capital de $350.000 no es un gasto.
+    expect(summary.totalMoney, 2950000);
 
     await database.close();
   });
@@ -234,9 +273,7 @@ void main() {
       final database = AppDatabase(NativeDatabase.memory());
 
       final accountRepository = AccountRepository(database);
-
       final debtRepository = DebtRepository(database);
-
       final debtPaymentService = DebtPaymentService(database);
 
       await accountRepository.create(
@@ -303,10 +340,13 @@ void main() {
             ),
           );
 
-      await debtPaymentService.registerPrincipalPayment(
+      await debtPaymentService.registerPayment(
         debtId: 'transfer-payment-debt',
         accountId: 'transfer-destination-account',
-        amount: 700000,
+        totalAmount: 700000,
+        principalAmount: 700000,
+        interestAmount: 0,
+        feeAmount: 0,
         date: DateTime(2026, 10, 6),
         note: 'Pago desde Cuenta B',
       );
@@ -331,17 +371,24 @@ void main() {
 
       expect(accountBBalance.balance, 0);
 
+      final debtPayments = await database.select(database.debtPayments).get();
+
+      expect(debtPayments, hasLength(1));
+      expect(debtPayments.single.totalAmount, 700000);
+      expect(debtPayments.single.principalAmount, 700000);
+      expect(debtPayments.single.interestAmount, 0);
+      expect(debtPayments.single.feeAmount, 0);
+
       await database.close();
     },
   );
 
-  test('MOLINA OS rechaza un pago sin fondos y no modifica la deuda ni crea un movimiento', () async {
+  test('MOLINA OS rechaza un pago sin fondos y no modifica '
+      'la deuda ni crea movimientos ni desglose', () async {
     final database = AppDatabase(NativeDatabase.memory());
 
     final accountRepository = AccountRepository(database);
-
     final debtRepository = DebtRepository(database);
-
     final debtPaymentService = DebtPaymentService(database);
 
     await accountRepository.create(
@@ -383,10 +430,13 @@ void main() {
         );
 
     expect(
-      () => debtPaymentService.registerPrincipalPayment(
+      () => debtPaymentService.registerPayment(
         debtId: 'insufficient-funds-debt',
         accountId: 'insufficient-funds-account',
-        amount: 400000,
+        totalAmount: 400000,
+        principalAmount: 350000,
+        interestAmount: 40000,
+        feeAmount: 10000,
         date: DateTime(2026, 10, 6),
         note: 'Pago rechazado',
       ),
@@ -408,13 +458,16 @@ void main() {
     final transactions = await database.select(database.transactions).get();
 
     expect(transactions, hasLength(1));
-
     expect(transactions.first.amount, 300000);
 
     expect(
       transactions.first.type,
       transaction_model.TransactionType.income.index,
     );
+
+    final debtPayments = await database.select(database.debtPayments).get();
+
+    expect(debtPayments, isEmpty);
 
     await database.close();
   });

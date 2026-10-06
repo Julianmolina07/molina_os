@@ -11,16 +11,14 @@ class TransactionsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final transactionRepository =
-        TransactionRepository(DatabaseProvider.instance);
+    final transactionRepository = TransactionRepository(
+      DatabaseProvider.instance,
+    );
 
-    final accountRepository =
-        AccountRepository(DatabaseProvider.instance);
+    final accountRepository = AccountRepository(DatabaseProvider.instance);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Movimientos'),
-      ),
+      appBar: AppBar(title: const Text('Movimientos')),
       body: StreamBuilder<List<Transaction>>(
         stream: transactionRepository.watchAll(),
         builder: (context, transactionSnapshot) {
@@ -41,9 +39,7 @@ class TransactionsPage extends StatelessWidget {
           }
 
           if (!transactionSnapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           final transactions = transactionSnapshot.data!;
@@ -58,9 +54,7 @@ class TransactionsPage extends StatelessWidget {
                     Icon(
                       Icons.receipt_long_rounded,
                       size: 56,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
+                      color: Theme.of(context).colorScheme.onSurface
                           .withValues(alpha: 0.35),
                     ),
                     const SizedBox(height: 16),
@@ -78,9 +72,7 @@ class TransactionsPage extends StatelessWidget {
                       'que registres aparecerán aquí.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
+                        color: Theme.of(context).colorScheme.onSurface
                             .withValues(alpha: 0.65),
                       ),
                     ),
@@ -110,9 +102,7 @@ class TransactionsPage extends StatelessWidget {
               }
 
               if (!accountSnapshot.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
+                return const Center(child: CircularProgressIndicator());
               }
 
               final accounts = accountSnapshot.data!;
@@ -124,30 +114,27 @@ class TransactionsPage extends StatelessWidget {
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                 itemCount: transactions.length,
-                separatorBuilder: (_, index) =>
-                    const SizedBox(height: 10),
+                separatorBuilder: (_, index) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final transaction = transactions[index];
 
-                  final type =
-                      transaction_model.TransactionType.values[
-                          transaction.type];
+                  final type = transaction_model
+                      .TransactionType
+                      .values[transaction.type];
 
                   final accountName =
                       accountNames[transaction.accountId] ??
-                          'Cuenta desconocida';
+                      'Cuenta desconocida';
 
                   final destinationAccountName =
                       transaction.destinationAccountId == null
-                          ? null
-                          : accountNames[
-                              transaction.destinationAccountId!];
+                      ? null
+                      : accountNames[transaction.destinationAccountId!];
 
                   return _TransactionCard(
                     transaction: transaction,
                     accountName: accountName,
-                    destinationAccountName:
-                        destinationAccountName,
+                    destinationAccountName: destinationAccountName,
                     type: type,
                   );
                 },
@@ -173,9 +160,7 @@ class _TransactionCard extends StatelessWidget {
     required this.type,
   });
 
-  String _categoryName(
-    transaction_model.TransactionCategory category,
-  ) {
+  String _categoryName(transaction_model.TransactionCategory category) {
     switch (category) {
       case transaction_model.TransactionCategory.food:
         return 'Alimentación';
@@ -233,73 +218,87 @@ class _TransactionCard extends StatelessWidget {
     return '$day/$month/$year';
   }
 
+  String _transactionTitle() {
+    switch (type) {
+      case transaction_model.TransactionType.income:
+        return 'Ingreso';
+      case transaction_model.TransactionType.expense:
+        return 'Gasto';
+      case transaction_model.TransactionType.transfer:
+        return 'Transferencia';
+      case transaction_model.TransactionType.debtPayment:
+        return 'Pago de deuda';
+      case transaction_model.TransactionType.lending:
+        return 'Préstamo';
+      case transaction_model.TransactionType.repayment:
+        return 'Cobro';
+    }
+  }
+
+  Color _iconColor(ColorScheme colorScheme) {
+    switch (type) {
+      case transaction_model.TransactionType.income:
+      case transaction_model.TransactionType.repayment:
+        return Colors.green;
+      case transaction_model.TransactionType.transfer:
+        return colorScheme.secondary;
+      case transaction_model.TransactionType.expense:
+      case transaction_model.TransactionType.debtPayment:
+      case transaction_model.TransactionType.lending:
+        return Colors.red;
+    }
+  }
+
+  IconData _icon() {
+    switch (type) {
+      case transaction_model.TransactionType.income:
+        return Icons.arrow_downward_rounded;
+      case transaction_model.TransactionType.expense:
+        return Icons.arrow_upward_rounded;
+      case transaction_model.TransactionType.transfer:
+        return Icons.swap_horiz_rounded;
+      case transaction_model.TransactionType.debtPayment:
+        return Icons.payments_outlined;
+      case transaction_model.TransactionType.lending:
+        return Icons.person_add_alt_1_rounded;
+      case transaction_model.TransactionType.repayment:
+        return Icons.person_rounded;
+    }
+  }
+
+  String _amountPrefix() {
+    switch (type) {
+      case transaction_model.TransactionType.income:
+      case transaction_model.TransactionType.repayment:
+        return '+';
+      case transaction_model.TransactionType.expense:
+      case transaction_model.TransactionType.debtPayment:
+      case transaction_model.TransactionType.lending:
+        return '-';
+      case transaction_model.TransactionType.transfer:
+        return '';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    final isIncome =
-        type == transaction_model.TransactionType.income;
-
-    final isTransfer =
-        type == transaction_model.TransactionType.transfer;
+    final isTransfer = type == transaction_model.TransactionType.transfer;
 
     final category =
-        transaction_model.TransactionCategory.values[
-            transaction.category];
+        transaction_model.TransactionCategory.values[transaction.category];
 
-    final String title;
+    final subtitle = isTransfer
+        ? destinationAccountName == null
+              ? accountName
+              : '$accountName → $destinationAccountName'
+        : '${_categoryName(category)} · $accountName';
 
-    if (isTransfer) {
-      title = 'Transferencia';
-    } else if (isIncome) {
-      title = 'Ingreso';
-    } else {
-      title = 'Gasto';
-    }
-
-    final String subtitle;
-
-    if (isTransfer) {
-      subtitle = destinationAccountName == null
-          ? accountName
-          : '$accountName → $destinationAccountName';
-    } else {
-      subtitle =
-          '${_categoryName(category)} · $accountName';
-    }
-
-    final Color iconColor;
-
-    if (isTransfer) {
-      iconColor = colorScheme.secondary;
-    } else if (isIncome) {
-      iconColor = Colors.green;
-    } else {
-      iconColor = Colors.red;
-    }
-
-    final IconData icon;
-
-    if (isTransfer) {
-      icon = Icons.swap_horiz_rounded;
-    } else if (isIncome) {
-      icon = Icons.arrow_downward_rounded;
-    } else {
-      icon = Icons.arrow_upward_rounded;
-    }
-
-    final String amountPrefix;
-
-    if (isTransfer) {
-      amountPrefix = '';
-    } else if (isIncome) {
-      amountPrefix = '+';
-    } else {
-      amountPrefix = '-';
-    }
+    final iconColor = _iconColor(colorScheme);
 
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(18, 16, 8, 16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
@@ -313,10 +312,7 @@ class _TransactionCard extends StatelessWidget {
               color: iconColor.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(
-              icon,
-              color: iconColor,
-            ),
+            child: Icon(_icon(), color: iconColor),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -324,7 +320,7 @@ class _TransactionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  _transactionTitle(),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -336,8 +332,7 @@ class _TransactionCard extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 14,
-                    color: colorScheme.onSurface
-                        .withValues(alpha: 0.70),
+                    color: colorScheme.onSurface.withValues(alpha: 0.70),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -345,24 +340,114 @@ class _TransactionCard extends StatelessWidget {
                   _formatDate(transaction.date),
                   style: TextStyle(
                     fontSize: 13,
-                    color: colorScheme.onSurface
-                        .withValues(alpha: 0.45),
+                    color: colorScheme.onSurface.withValues(alpha: 0.45),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          Text(
-            '$amountPrefix${_formatAmount(transaction.amount)}',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              color: iconColor,
-            ),
+          const SizedBox(width: 8),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${_amountPrefix()}${_formatAmount(transaction.amount)}',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                  color: iconColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              IconButton(
+                onPressed: () {
+                  _confirmDelete(context);
+                },
+                icon: const Icon(Icons.more_vert_rounded),
+                tooltip: 'Opciones',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final isDebtPayment = type == transaction_model.TransactionType.debtPayment;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Eliminar movimiento'),
+          content: Text(
+            isDebtPayment
+                ? 'Este movimiento corresponde a un pago de deuda. '
+                      'Al eliminarlo, también se eliminará el registro del pago '
+                      'y se restaurará el capital pendiente de la deuda. '
+                      'Esta acción no se puede deshacer.'
+                : 'Se eliminará este movimiento. '
+                      'Esta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: colorSchemeFor(context).error,
+                foregroundColor: colorSchemeFor(context).onError,
+              ),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    try {
+      final deleted = await TransactionRepository(DatabaseProvider.instance)
+          .delete(transaction.id);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      if (!deleted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('El movimiento ya no existe.')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Movimiento eliminado correctamente.')),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar el movimiento: $error')),
+      );
+    }
+  }
+
+  ColorScheme colorSchemeFor(BuildContext context) {
+    return Theme.of(context).colorScheme;
   }
 }

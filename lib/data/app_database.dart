@@ -67,8 +67,7 @@ class Debts extends Table {
 
   /// Tasa de interés anual en porcentaje.
   /// Ejemplo: 24.5 representa 24.5% E.A.
-  RealColumn get interestRate =>
-      real().withDefault(const Constant(0.0))();
+  RealColumn get interestRate => real().withDefault(const Constant(0.0))();
 
   DateTimeColumn get startDate => dateTime()();
 
@@ -84,8 +83,7 @@ class Debts extends Table {
   /// 3 = monthly
   /// 4 = quarterly
   /// 5 = yearly
-  IntColumn get frequency =>
-      integer().withDefault(const Constant(3))();
+  IntColumn get frequency => integer().withDefault(const Constant(3))();
 
   DateTimeColumn get nextDueDate => dateTime().nullable()();
 
@@ -94,8 +92,7 @@ class Debts extends Table {
   /// 1 = paid
   /// 2 = overdue
   /// 3 = cancelled
-  IntColumn get status =>
-      integer().withDefault(const Constant(0))();
+  IntColumn get status => integer().withDefault(const Constant(0))();
 
   TextColumn get notes => text().nullable()();
 
@@ -103,35 +100,62 @@ class Debts extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(
-  tables: [
-    Accounts,
-    Transactions,
-    Debts,
-  ],
-)
-class AppDatabase extends _$AppDatabase {
-  AppDatabase([QueryExecutor? executor])
-      : super(executor ?? _openConnection());
+class DebtPayments extends Table {
+  TextColumn get id => text()();
+
+  /// Deuda a la que pertenece este pago.
+  TextColumn get debtId => text()();
+
+  /// Movimiento financiero que representa la salida
+  /// total de dinero de la cuenta.
+  TextColumn get transactionId => text()();
+
+  /// Valor total que salió de la cuenta.
+  IntColumn get totalAmount => integer()();
+
+  /// Parte del pago que reduce el capital de la deuda.
+  IntColumn get principalAmount => integer()();
+
+  /// Parte del pago correspondiente a intereses.
+  IntColumn get interestAmount => integer().withDefault(const Constant(0))();
+
+  /// Comisiones, seguros u otros cargos asociados al pago.
+  IntColumn get feeAmount => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get date => dateTime()();
+
+  TextColumn get note => text().nullable()();
 
   @override
-  int get schemaVersion => 3;
+  Set<Column> get primaryKey => {id};
+}
+
+@DriftDatabase(tables: [Accounts, Transactions, Debts, DebtPayments])
+class AppDatabase extends _$AppDatabase {
+  AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
+
+  @override
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (Migrator m) async {
-          await m.createAll();
-        },
-        onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.createTable(transactions);
-          }
+    onCreate: (Migrator m) async {
+      await m.createAll();
+    },
+    onUpgrade: (Migrator m, int from, int to) async {
+      if (from < 2) {
+        await m.createTable(transactions);
+      }
 
-          if (from < 3) {
-            await m.createTable(debts);
-          }
-        },
-      );
+      if (from < 3) {
+        await m.createTable(debts);
+      }
+
+      if (from < 4) {
+        await m.createTable(debtPayments);
+      }
+    },
+  );
 }
 
 QueryExecutor _openConnection() {

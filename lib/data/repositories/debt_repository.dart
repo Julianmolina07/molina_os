@@ -7,7 +7,6 @@ class DebtRepository {
 
   const DebtRepository(this.database);
 
-  /// Observa todas las deudas registradas.
   Stream<List<Debt>> watchAll() {
     return (database.select(database.debts)..orderBy([
           (debt) => OrderingTerm(
@@ -18,30 +17,22 @@ class DebtRepository {
         .watch();
   }
 
-  /// Busca una deuda por su ID.
   Future<Debt?> findById(String id) {
     return (database.select(
       database.debts,
     )..where((debt) => debt.id.equals(id))).getSingleOrNull();
   }
 
-  /// Crea una nueva deuda.
   Future<void> create(DebtsCompanion debt) {
     return database.into(database.debts).insert(debt);
   }
 
-  /// Actualiza una deuda existente.
   Future<bool> updateDebt(DebtsCompanion debt) async {
     final updatedRows = await database.update(database.debts).write(debt);
 
     return updatedRows > 0;
   }
 
-  /// Registra un abono sobre el capital pendiente.
-  ///
-  /// El pago no puede superar el saldo actual de la deuda.
-  /// Cuando el saldo llega a cero, la deuda pasa automáticamente
-  /// a estado "pagada".
   Future<bool> registerPrincipalPayment({
     required String debtId,
     required int amount,
@@ -81,10 +72,34 @@ class DebtRepository {
     return updatedRows > 0;
   }
 
-  /// Elimina una deuda.
-  Future<void> delete(String id) {
-    return (database.delete(
-      database.debts,
-    )..where((debt) => debt.id.equals(id))).go();
+  Future<bool> delete(String id) async {
+    return database.transaction(() async {
+      final debt = await findById(id);
+
+      if (debt == null) {
+        return false;
+      }
+
+      final payments = await (database.select(
+        database.debtPayments,
+      )..where((payment) => payment.debtId.equals(id))).get();
+
+      for (final payment in payments) {
+        await (database.delete(database.transactions)..where(
+              (transaction) => transaction.id.equals(payment.transactionId),
+            ))
+            .go();
+      }
+
+      await (database.delete(
+        database.debtPayments,
+      )..where((payment) => payment.debtId.equals(id))).go();
+
+      final deletedRows = await (database.delete(
+        database.debts,
+      )..where((debt) => debt.id.equals(id))).go();
+
+      return deletedRows > 0;
+    });
   }
 }

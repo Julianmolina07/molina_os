@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/theme_controller.dart';
 import '../../data/app_database.dart';
 import '../../data/database_provider.dart';
 import '../../data/repositories/debt_repository.dart';
@@ -9,9 +10,12 @@ import '../accounts/accounts_page.dart';
 import '../debts/debts_page.dart';
 import '../transactions/add_transaction_page.dart';
 import '../transactions/transactions_page.dart';
+import '../settings/settings_page.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  final ThemeController themeController;
+
+  const DashboardPage({super.key, required this.themeController});
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +43,16 @@ class DashboardPage extends StatelessWidget {
         ),
         actions: [
           IconButton(
-            onPressed: () {},
-            icon: Icon(
-              Icons.notifications_none_rounded,
-              color: colorScheme.onSurface,
-            ),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      SettingsPage(themeController: themeController),
+                ),
+              );
+            },
+            icon: Icon(Icons.settings_outlined, color: colorScheme.onSurface),
+            tooltip: 'Configuración',
           ),
         ],
       ),
@@ -237,7 +246,9 @@ class DashboardPage extends StatelessWidget {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => const DebtsPage(),
+                              builder: (_) => DebtsPage(
+                                database: DatabaseProvider.instance,
+                              ),
                             ),
                           );
                         },

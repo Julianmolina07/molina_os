@@ -26,9 +26,37 @@ class Accounts extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+class Transactions extends Table {
+  TextColumn get id => text()();
+
+  IntColumn get type => integer()();
+
+  IntColumn get amount => integer()();
+
+  TextColumn get accountId => text()();
+
+  IntColumn get category => integer()();
+
+  DateTimeColumn get date => dateTime()();
+
+  TextColumn get destinationAccountId => text().nullable()();
+
+  TextColumn get personId => text().nullable()();
+
+  TextColumn get debtId => text().nullable()();
+
+  IntColumn get context => integer().nullable()();
+
+  TextColumn get note => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Accounts,
+    Transactions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -36,7 +64,19 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(transactions);
+          }
+        },
+      );
 }
 
 LazyDatabase _openConnection() {

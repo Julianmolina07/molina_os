@@ -1,43 +1,62 @@
-enum DebtType {
-  creditCard,
-  installmentLoan,
-  personal,
-  other,
-}
 enum DebtStatus {
   active,
   paid,
-  paused,
+  overdue,
+  cancelled,
 }
+
+enum DebtFrequency {
+  oneTime,
+  weekly,
+  biweekly,
+  monthly,
+  quarterly,
+  yearly,
+}
+
 class Debt {
   final String id;
-  final String name;
   final String creditor;
-  final DebtType type;
-  /// Persona que aparece legalmente como responsable de la deuda.
-  final String legalDebtor;
-  /// Persona que realmente realiza los pagos.
-  final String economicResponsible;
-  /// Saldo pendiente actual.
-  final int remainingAmount;
-  /// Tasa de interés anual, si se conoce.
-  final double? annualInterestRate;
-  /// Valor aproximado de la cuota periódica.
+  final String name;
+
+  /// Valor original de la deuda.
+  final int originalAmount;
+
+  /// Saldo de capital pendiente.
+  final int remainingBalance;
+
+  /// Tasa de interés anual expresada como porcentaje.
+  /// Ejemplo: 24.5 significa 24.5% E.A.
+  final double interestRate;
+
+  final DateTime startDate;
+  final DateTime? dueDate;
+
+  /// Valor habitual de la cuota.
   final int? installmentAmount;
-  /// Día habitual de vencimiento.
-  final int? dueDay;
+
+  final DebtFrequency frequency;
+
+  /// Próxima fecha en la que debe realizarse un pago.
+  final DateTime? nextDueDate;
+
   final DebtStatus status;
+
+  final String? notes;
+
   const Debt({
     required this.id,
-    required this.name,
     required this.creditor,
-    required this.type,
-    required this.legalDebtor,
-    required this.economicResponsible,
-    required this.remainingAmount,
-    this.annualInterestRate,
+    required this.name,
+    required this.originalAmount,
+    required this.remainingBalance,
+    this.interestRate = 0,
+    required this.startDate,
+    this.dueDate,
     this.installmentAmount,
-    this.dueDay,
+    this.frequency = DebtFrequency.monthly,
+    this.nextDueDate,
     this.status = DebtStatus.active,
+    this.notes,
   });
 }

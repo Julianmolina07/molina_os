@@ -3,6 +3,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:molina_os/data/app_database.dart';
 import 'package:molina_os/data/repositories/account_repository.dart';
+import 'package:molina_os/data/repositories/debt_repository.dart';
 import 'package:molina_os/data/repositories/transaction_repository.dart';
 
 void main() {
@@ -47,6 +48,47 @@ void main() {
     expect(transaction, isNotNull);
     expect(transaction!.amount, 50000);
     expect(transaction.accountId, 'test-account');
+
+    await database.close();
+  });
+
+  test('MOLINA OS puede guardar y consultar una deuda', () async {
+    final database = AppDatabase(
+      NativeDatabase.memory(),
+    );
+
+    final debtRepository = DebtRepository(database);
+
+    await debtRepository.create(
+      DebtsCompanion.insert(
+        id: 'test-debt',
+        creditor: 'Banco de prueba',
+        name: 'Tarjeta de crédito',
+        originalAmount: 8000000,
+        remainingBalance: 5400000,
+        interestRate: const Value(25.0),
+        startDate: DateTime(2026, 1, 15),
+        installmentAmount: const Value(450000),
+        frequency: const Value(3),
+        nextDueDate: Value(
+          DateTime(2026, 11, 15),
+        ),
+        status: const Value(0),
+        notes: const Value('Deuda de prueba'),
+      ),
+    );
+
+    final debt = await debtRepository.findById('test-debt');
+
+    expect(debt, isNotNull);
+    expect(debt!.creditor, 'Banco de prueba');
+    expect(debt.name, 'Tarjeta de crédito');
+    expect(debt.originalAmount, 8000000);
+    expect(debt.remainingBalance, 5400000);
+    expect(debt.interestRate, 25.0);
+    expect(debt.installmentAmount, 450000);
+    expect(debt.frequency, 3);
+    expect(debt.status, 0);
 
     await database.close();
   });

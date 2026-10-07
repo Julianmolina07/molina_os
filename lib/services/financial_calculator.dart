@@ -96,8 +96,12 @@ class FinancialCalculator {
               balances[transaction.accountId]! - transaction.amount;
 
         case transaction_model.TransactionType.lending:
+          balances[transaction.accountId] =
+              balances[transaction.accountId]! - transaction.amount;
+
         case transaction_model.TransactionType.repayment:
-          break;
+          balances[transaction.accountId] =
+              balances[transaction.accountId]! + transaction.amount;
       }
     }
 

@@ -38,11 +38,92 @@ class Transactions extends Table {
 
   TextColumn get destinationAccountId => text().nullable()();
 
+  /// Persona relacionada con el movimiento.
+  ///
+  /// Se utiliza principalmente para préstamos y cobros,
+  /// pero puede reutilizarse para otros movimientos relacionados
+  /// con una persona.
   TextColumn get personId => text().nullable()();
 
   TextColumn get debtId => text().nullable()();
 
   IntColumn get context => integer().nullable()();
+
+  TextColumn get note => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class People extends Table {
+  TextColumn get id => text()();
+
+  /// Nombre completo o nombre identificador de la persona.
+  TextColumn get name => text()();
+
+  /// Teléfono opcional.
+  TextColumn get phone => text().nullable()();
+
+  /// Notas generales sobre la persona.
+  TextColumn get notes => text().nullable()();
+
+  /// Permite conservar el historial sin eliminar físicamente
+  /// a la persona.
+  BoolColumn get active => boolean().withDefault(const Constant(true))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class Loans extends Table {
+  TextColumn get id => text()();
+
+  /// Persona que recibió el dinero.
+  TextColumn get personId => text()();
+
+  /// Movimiento financiero original de tipo lending.
+  ///
+  /// Este movimiento representa la salida real del dinero.
+  TextColumn get initialTransactionId => text()();
+
+  /// Valor original prestado.
+  IntColumn get originalAmount => integer()();
+
+  /// Saldo que la persona todavía debe.
+  IntColumn get remainingBalance => integer()();
+
+  DateTimeColumn get startDate => dateTime()();
+
+  /// Fecha prevista de pago, si existe.
+  DateTimeColumn get dueDate => dateTime().nullable()();
+
+  /// Estado:
+  /// 0 = active
+  /// 1 = paid
+  /// 2 = cancelled
+  IntColumn get status => integer().withDefault(const Constant(0))();
+
+  TextColumn get notes => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class LoanPayments extends Table {
+  TextColumn get id => text()();
+
+  /// Préstamo al que pertenece este cobro.
+  TextColumn get loanId => text()();
+
+  /// Movimiento financiero de tipo repayment.
+  ///
+  /// Este movimiento representa la entrada real del dinero.
+  TextColumn get transactionId => text()();
+
+  /// Valor recibido.
+  IntColumn get amount => integer()();
+
+  DateTimeColumn get date => dateTime()();
 
   TextColumn get note => text().nullable()();
 
@@ -130,32 +211,48 @@ class DebtPayments extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-@DriftDatabase(tables: [Accounts, Transactions, Debts, DebtPayments])
+@DriftDatabase(
+  tables: [
+    Accounts,
+    Transactions,
+    People,
+    Loans,
+    LoanPayments,
+    Debts,
+    DebtPayments,
+  ],
+)
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) async {
-      await m.createAll();
-    },
-    onUpgrade: (Migrator m, int from, int to) async {
-      if (from < 2) {
-        await m.createTable(transactions);
-      }
+        onCreate: (Migrator m) async {
+          await m.createAll();
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from < 2) {
+            await m.createTable(transactions);
+          }
 
-      if (from < 3) {
-        await m.createTable(debts);
-      }
+          if (from < 3) {
+            await m.createTable(debts);
+          }
 
-      if (from < 4) {
-        await m.createTable(debtPayments);
-      }
-    },
-  );
+          if (from < 4) {
+            await m.createTable(debtPayments);
+          }
+
+          if (from < 5) {
+            await m.createTable(people);
+            await m.createTable(loans);
+            await m.createTable(loanPayments);
+          }
+        },
+      );
 }
 
 QueryExecutor _openConnection() {

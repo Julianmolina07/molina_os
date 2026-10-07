@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/app_database.dart';
 import '../../data/database_provider.dart';
 import '../../data/repositories/loan_repository.dart';
+import '../../data/repositories/loan_payment_repository.dart';
 import '../../services/loan_service.dart';
 import 'register_loan_page.dart';
 import 'register_loan_payment_page.dart';
@@ -430,6 +431,10 @@ class _LoanCard extends StatelessWidget {
                 ? Icons.cancel_outlined
                 : Icons.help_outline;
 
+    final paymentRepository = LoanPaymentRepository(
+      DatabaseProvider.instance,
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -536,6 +541,138 @@ class _LoanCard extends StatelessWidget {
               ),
             ),
           ],
+
+          const SizedBox(height: 18),
+
+          StreamBuilder<List<LoanPayment>>(
+            stream: paymentRepository.watchByLoan(loan.id),
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Text(
+                  'No se pudo cargar el historial de cobros.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.error,
+                  ),
+                );
+              }
+
+              if (!snapshot.hasData) {
+                return const SizedBox(
+                  height: 24,
+                  child: Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              final payments = snapshot.data!;
+
+              if (payments.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.history_outlined,
+                        size: 20,
+                        color: colorScheme.onSurface.withValues(
+                          alpha: 0.55,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Todavía no hay cobros registrados.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.65,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
+                ),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.history_outlined,
+                    color: colorScheme.onSurface,
+                  ),
+                  title: Text(
+                    'Historial de cobros',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${payments.length} '
+                    '${payments.length == 1 ? 'cobro' : 'cobros'}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withValues(
+                        alpha: 0.60,
+                      ),
+                    ),
+                  ),
+                  children: [
+                    const SizedBox(height: 4),
+                    ...payments.asMap().entries.map(
+                      (entry) {
+                        final index = entry.key;
+                        final payment = entry.value;
+
+                        final balanceAfter =
+                            loan.originalAmount -
+                            payments
+                                .skip(index)
+                                .fold<int>(
+                                  0,
+                                  (total, item) =>
+                                      total + item.amount,
+                                );
+
+                        return Padding(
+                          padding: EdgeInsets.only(
+                       bottom:
+                                index == payments.length - 1
+                                    ? 0
+                                    : 10,
+                          ),
+                          child: _LoanPaymentHistoryRow(
+                            payment: payment,
+                            balanceAfter: balanceAfter,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
 
           if (isActive) ...[
             const SizedBox(height: 18),
@@ -666,6 +803,141 @@ class _LoanCard extends StatelessWidget {
         date.month.toString().padLeft(2, '0');
 
     return '$day/$month/${date.year}';
+  }
+}
+
+class _LoanPaymentHistoryRow extends StatelessWidget {
+  final LoanPayment payment;
+  final int balanceAfter;
+
+  const _LoanPaymentHistoryRow({
+    required this.payment,
+    required this.balanceAfter,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.payments_outlined,
+              size: 18,
+              color: colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Cobro',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _formatCurrency(payment.amount),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatDate(payment.date),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurface.withValues(
+                      alpha: 0.60,
+                    ),
+                  ),
+                ),
+                if (payment.note != null &&
+                    payment.note!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    payment.note!,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colorScheme.onSurface.withValues(
+                        alpha: 0.70,
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Saldo después: '
+                  '${_formatCurrency(balanceAfter)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface.withValues(
+                      alpha: 0.70,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime date) {
+    final day =
+        date.day.toString().padLeft(2, '0');
+    final month =
+        date.month.toString().padLeft(2, '0');
+
+    return '$day/$month/${date.year}';
+  }
+
+  static String _formatCurrency(int amount) {
+    final value = amount.abs().toString();
+    final buffer = StringBuffer();
+
+    for (var i = 0; i < value.length; i++) {
+      final positionFromEnd = value.length - i;
+
+      buffer.write(value[i]);
+
+      if (positionFromEnd > 1 &&
+          positionFromEnd % 3 == 1) {
+        buffer.write('.');
+      }
+    }
+
+    return '${amount < 0 ? '-\$' : '\$'}${buffer.toString()}';
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/app_database.dart';
 import '../../data/database_provider.dart';
 import '../../data/repositories/loan_repository.dart';
+import '../../services/loan_service.dart';
 import 'register_loan_page.dart';
 import 'register_loan_payment_page.dart';
 
@@ -407,8 +408,7 @@ class _LoanCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme =
-        Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final isActive = loan.status == 0;
     final isPaid = loan.status == 1;
@@ -438,8 +438,7 @@ class _LoanCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -456,17 +455,43 @@ class _LoanCard extends StatelessWidget {
               Icon(
                 statusIcon,
                 size: 20,
-                color: colorScheme.onSurface
-                    .withValues(alpha: 0.70),
+                color: colorScheme.onSurface.withValues(
+                  alpha: 0.70,
+                ),
               ),
               const SizedBox(width: 6),
               Text(
                 statusText,
                 style: TextStyle(
                   fontSize: 13,
-                  color: colorScheme.onSurface
-                      .withValues(alpha: 0.65),
+                  color: colorScheme.onSurface.withValues(
+                    alpha: 0.65,
+                  ),
                 ),
+              ),
+              const SizedBox(width: 4),
+              PopupMenuButton<String>(
+                tooltip: 'Opciones del préstamo',
+                onSelected: (value) async {
+                  if (value == 'delete') {
+                    await _confirmDelete(context);
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        SizedBox(width: 12),
+                        Text('Eliminar préstamo'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -491,8 +516,9 @@ class _LoanCard extends StatelessWidget {
               'Fecha límite: ${_formatDate(loan.dueDate!)}',
               style: TextStyle(
                 fontSize: 13,
-                color: colorScheme.onSurface
-                    .withValues(alpha: 0.60),
+                color: colorScheme.onSurface.withValues(
+                  alpha: 0.60,
+                ),
               ),
             ),
           ],
@@ -504,8 +530,9 @@ class _LoanCard extends StatelessWidget {
               loan.notes!,
               style: TextStyle(
                 fontSize: 13,
-                color: colorScheme.onSurface
-                    .withValues(alpha: 0.70),
+                color: colorScheme.onSurface.withValues(
+                  alpha: 0.70,
+                ),
               ),
             ),
           ],
@@ -552,6 +579,84 @@ class _LoanCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+  ) async {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            'Eliminar préstamo',
+          ),
+          content: Text(
+            '¿Quieres eliminar este préstamo de '
+            '${person.name}?\n\n'
+            'Se eliminarán también todos los cobros '
+            'asociados y sus movimientos financieros. '
+            'Esta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    final loanService = LoanService(
+      DatabaseProvider.instance,
+    );
+
+    try {
+      await loanService.deleteLoan(loan.id);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Préstamo eliminado correctamente.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'No se pudo eliminar el préstamo:\n$error',
+          ),
+        ),
+      );
+    }
   }
 
   static String _formatDate(DateTime date) {

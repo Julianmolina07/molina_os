@@ -130,4 +130,70 @@ class LoanService {
       );
     });
   }
+
+  Future<void> deleteLoan(String loanId) async {
+    await database.transaction(() async {
+      final loan = await (database.select(database.loans)
+            ..where((item) => item.id.equals(loanId)))
+          .getSingleOrNull();
+
+      if (loan == null) {
+        throw StateError(
+          'El préstamo que intentas eliminar no existe.',
+        );
+      }
+
+      // ============================================================
+      // ELIMINAR COBROS Y SUS MOVIMIENTOS
+      // ============================================================
+
+      final payments = await (database.select(database.loanPayments)
+            ..where(
+              (payment) => payment.loanId.equals(loan.id),
+            ))
+          .get();
+
+      for (final payment in payments) {
+        await (database.delete(database.transactions)
+              ..where(
+                (transaction) =>
+                    transaction.id.equals(payment.transactionId),
+              ))
+            .go();
+
+        await (database.delete(database.loanPayments)
+              ..where(
+                (item) => item.id.equals(payment.id),
+              ))
+            .go();
+      }
+
+      // ============================================================
+      // ELIMINAR MOVIMIENTO ORIGINAL DEL PRÉSTAMO
+      // ============================================================
+
+      await (database.delete(database.transactions)
+            ..where(
+              (transaction) =>
+                  transaction.id.equals(loan.initialTransactionId),
+            ))
+          .go();
+
+      // ============================================================
+      // ELIMINAR EL PRÉSTAMO
+      // ============================================================
+
+      final deletedRows = await (database.delete(database.loans)
+            ..where(
+              (item) => item.id.equals(loan.id),
+            ))
+          .go();
+
+      if (deletedRows == 0) {
+        throw StateError(
+          'No se pudo eliminar el préstamo.',
+        );
+      }
+    });
+  }
 }
